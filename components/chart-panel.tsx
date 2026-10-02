@@ -1,0 +1,127 @@
+"use client";
+
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
+
+export type ChartConfig = {
+  type: "bar" | "line" | "pie" | "scatter" | "histogram" | "table";
+  xKey: string;
+  yKey: string;
+  title: string;
+};
+
+type Props = {
+  rows: Record<string, unknown>[];
+  chartConfig: ChartConfig;
+};
+
+const COLORS = [
+  "#6366f1", "#8b5cf6", "#a78bfa", "#818cf8",
+  "#c4b5fd", "#4f46e5", "#7c3aed", "#9333ea",
+];
+
+const tooltipStyle = {
+  backgroundColor: "#1c1c1e",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "8px",
+  color: "#f4f4f5",
+  fontSize: 13,
+};
+
+export function ChartPanel({ rows, chartConfig }: Props) {
+  const { type, xKey, yKey, title } = chartConfig;
+
+  if (!rows.length) return null;
+
+  const data = rows.map((r) => ({
+    ...r,
+    [yKey]: typeof r[yKey] === "string" ? parseFloat(r[yKey] as string) : r[yKey],
+  }));
+
+  const axisStyle = { fill: "#a1a1aa", fontSize: 11 };
+
+  return (
+    <div className="w-full mt-2">
+      <p className="text-sm font-medium text-muted-foreground mb-3">{title}</p>
+
+      {/*
+        Fixed CSS height + w-full so ResponsiveContainer always measures a
+        known, stable size on first paint — prevents the "grows from small" effect.
+        isAnimationActive={false} on each series disables Recharts entry animation.
+      */}
+      <div className="w-full h-64 sm:h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          {type === "bar" ? (
+            <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 56 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey={xKey} tick={axisStyle} angle={-35} textAnchor="end" interval={0} />
+              <YAxis tick={axisStyle} width={48} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Bar dataKey={yKey} radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          ) : type === "line" ? (
+            <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 36 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey={xKey} tick={axisStyle} angle={-20} textAnchor="end" />
+              <YAxis tick={axisStyle} width={48} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: "#a1a1aa", fontSize: 11 }} />
+              <Line
+                type="monotone"
+                dataKey={yKey}
+                stroke="#6366f1"
+                strokeWidth={2}
+                dot={{ fill: "#6366f1", r: 3 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          ) : type === "pie" ? (
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey={yKey}
+                nameKey={xKey}
+                cx="50%"
+                cy="50%"
+                outerRadius="70%"
+                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                labelLine={false}
+                isAnimationActive={false}
+              >
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: "#a1a1aa", fontSize: 11 }} />
+            </PieChart>
+          ) : type === "scatter" ? (
+            <ScatterChart margin={{ top: 4, right: 8, left: 0, bottom: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey={xKey} type="number" tick={axisStyle} name={xKey} />
+              <YAxis dataKey={yKey} type="number" tick={axisStyle} name={yKey} width={48} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: "3 3" }} />
+              <Scatter data={data} fill="#6366f1" isAnimationActive={false} />
+            </ScatterChart>
+          ) : (
+            /* histogram */
+            <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 36 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey={xKey} tick={axisStyle} />
+              <YAxis tick={axisStyle} width={48} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Bar dataKey={yKey} fill="#6366f1" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
