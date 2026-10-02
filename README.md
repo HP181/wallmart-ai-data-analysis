@@ -21,7 +21,7 @@ Built with **Next.js 15**, **GPT-4o**, and **Neon PostgreSQL**.
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | AI | OpenAI GPT-4o |
 | Database | Neon (serverless PostgreSQL) |
 | Charts | Recharts |
