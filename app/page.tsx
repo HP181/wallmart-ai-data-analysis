@@ -6,7 +6,7 @@ import { BarChart2, Database, Sparkles } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="flex flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       <header className="shrink-0 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur px-4 sm:px-6 py-3 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600/20 border border-indigo-500/30">

@@ -23,10 +23,21 @@ export function ChatInterface() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isLoading = agent.status === "submitted" || agent.status === "streaming";
+  const messageCount = agent.data.messages.length;
 
+  // Scroll when a new message is added
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [agent.data.messages]);
+  }, [messageCount]);
+
+  // Slow smooth scroll when streaming finishes
+  useEffect(() => {
+    if (!isLoading) {
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  }, [isLoading]);
 
   function handleSend(text?: string) {
     const q = (text ?? input).trim();
@@ -49,7 +60,7 @@ export function ChatInterface() {
       {/* ── Messages scroll area ─────────────────────────────── */}
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-3 sm:px-4"
+        className="flex-1 min-h-0 overflow-y-auto scroll-smooth scrollbar-hide px-3 sm:px-4"
       >
         {agent.data.messages.length === 0 ? (
           <EmptyState onSelect={handleSend} />

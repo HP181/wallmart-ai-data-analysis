@@ -30,6 +30,8 @@ const tooltipStyle = {
   color: "#f4f4f5",
   fontSize: 13,
 };
+const tooltipLabelStyle = { color: "#a1a1aa", marginBottom: 4 };
+const tooltipItemStyle  = { color: "#e4e4e7" };
 
 export function ChartPanel({ rows, chartConfig }: Props) {
   const { type, xKey, yKey, title } = chartConfig;
@@ -43,15 +45,25 @@ export function ChartPanel({ rows, chartConfig }: Props) {
 
   const axisStyle = { fill: "#a1a1aa", fontSize: 11 };
 
+  /* Color legend for charts that use per-bar Cell coloring */
+  const ColorLegend = () => (
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 px-1">
+      {data.map((entry, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <span
+            className="h-2.5 w-2.5 rounded-sm shrink-0"
+            style={{ backgroundColor: COLORS[i % COLORS.length] }}
+          />
+          <span className="text-[11px] text-zinc-400">{String(entry[xKey])}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="w-full mt-2">
       <p className="text-sm font-medium text-muted-foreground mb-3">{title}</p>
 
-      {/*
-        Fixed CSS height + w-full so ResponsiveContainer always measures a
-        known, stable size on first paint — prevents the "grows from small" effect.
-        isAnimationActive={false} on each series disables Recharts entry animation.
-      */}
       <div className="w-full h-64 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           {type === "bar" ? (
@@ -59,7 +71,7 @@ export function ChartPanel({ rows, chartConfig }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey={xKey} tick={axisStyle} angle={-35} textAnchor="end" interval={0} />
               <YAxis tick={axisStyle} width={48} />
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
               <Bar dataKey={yKey} radius={[4, 4, 0, 0]} isAnimationActive={false}>
                 {data.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -71,7 +83,7 @@ export function ChartPanel({ rows, chartConfig }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey={xKey} tick={axisStyle} angle={-20} textAnchor="end" />
               <YAxis tick={axisStyle} width={48} />
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
               <Legend wrapperStyle={{ color: "#a1a1aa", fontSize: 11 }} />
               <Line
                 type="monotone"
@@ -99,7 +111,7 @@ export function ChartPanel({ rows, chartConfig }: Props) {
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
               <Legend wrapperStyle={{ color: "#a1a1aa", fontSize: 11 }} />
             </PieChart>
           ) : type === "scatter" ? (
@@ -107,7 +119,7 @@ export function ChartPanel({ rows, chartConfig }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey={xKey} type="number" tick={axisStyle} name={xKey} />
               <YAxis dataKey={yKey} type="number" tick={axisStyle} name={yKey} width={48} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: "3 3" }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={{ strokeDasharray: "3 3" }} />
               <Scatter data={data} fill="#6366f1" isAnimationActive={false} />
             </ScatterChart>
           ) : (
@@ -116,12 +128,19 @@ export function ChartPanel({ rows, chartConfig }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey={xKey} tick={axisStyle} />
               <YAxis tick={axisStyle} width={48} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey={yKey} fill="#6366f1" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
+              <Bar dataKey={yKey} fill="#6366f1" radius={[2, 2, 0, 0]} isAnimationActive={false}>
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Bar>
             </BarChart>
           )}
         </ResponsiveContainer>
       </div>
+
+      {/* Color legend — shown for bar and histogram */}
+      {(type === "bar" || type === "histogram") && <ColorLegend />}
     </div>
   );
 }
