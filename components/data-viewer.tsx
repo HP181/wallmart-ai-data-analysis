@@ -78,33 +78,23 @@ export function DataViewer({ onClose }: Props) {
   const lastRow  = Math.min((page + 1) * PAGE, filtered.length);
 
   return (
-    <div style={{
-      position: "fixed", top: 0, left: 0,
-      width: "100vw", height: "100vh",
-      zIndex: 50,
-      display: "grid", gridTemplateRows: "auto 1fr auto",
-      backgroundColor: "#09090b", color: "#e4e4e7",
-    }}>
+    <div className="fixed top-0 left-0 w-screen h-screen z-50 grid grid-rows-[auto_1fr_auto] bg-zinc-950 text-zinc-200">
 
       {/* Toolbar */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: "0.75rem", borderBottom: "1px solid #27272a", backgroundColor: "#18181b",
-        padding: "0.75rem 1.5rem",
-      }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900 px-6 py-3 w-screen overflow-scroll">
         <div>
-          <h2 style={{ fontSize: "0.875rem", fontWeight: 600, color: "#f4f4f5", lineHeight: 1 }}>
+          <h2 className="text-sm font-semibold text-zinc-100 leading-none">
             Walmart Dataset
           </h2>
-          <p style={{ marginTop: "0.125rem", fontSize: "0.6875rem", color: "#71717a" }}>
+          <p className="mt-0.5 text-[0.6875rem] text-zinc-500">
             {loading
               ? "Loading…"
               : `${filtered.length.toLocaleString()} / ${rows.length.toLocaleString()} rows · ${cols.length} columns`}
           </p>
         </div>
 
-        <div style={{ position: "relative", display: "flex", alignItems: "center", width: "13rem" }}>
-          <Search size={12} style={{ position: "absolute", left: "0.625rem", color: "#71717a", pointerEvents: "none" }} />
+        <div className="relative flex items-center w-52">
+          <Search size={12} className="absolute left-2.5 text-zinc-500 pointer-events-none" />
           <Input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -113,17 +103,11 @@ export function DataViewer({ onClose }: Props) {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div className="flex items-center gap-2">
           <a
             href="/api/export"
             download="walmart_cleaned_data.csv"
-            style={{
-              display: "flex", alignItems: "center", gap: "0.375rem", borderRadius: "0.5rem",
-              border: "1px solid #3f3f46", backgroundColor: "#27272a", padding: "0.375rem 0.625rem",
-              fontSize: "0.75rem", color: "#a1a1aa", textDecoration: "none",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#f4f4f5")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#a1a1aa")}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-zinc-400 no-underline hover:text-zinc-100 transition-colors"
           >
             <Download size={12} />Download CSV
           </a>
@@ -133,35 +117,28 @@ export function DataViewer({ onClose }: Props) {
         </div>
       </div>
 
-      {/* Scrollable table area: grid row 1fr handles height, overflow auto scrolls */}
-      <div style={{ minHeight: 0, overflow: "auto" }}>
+      {/* Scrollable table area */}
+      <div className="min-h-0 overflow-auto">
         {loading && (
-          <div style={{
-            height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-            gap: "0.75rem", color: "#71717a", fontSize: "0.875rem",
-          }}>
+          <div className="h-full flex items-center justify-center gap-3 text-zinc-500 text-sm">
             <Loader2 size={18} className="animate-spin text-indigo-400" />
             Fetching data from Neon…
           </div>
         )}
         {error && (
-          <div style={{
-            height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#f87171", fontSize: "0.875rem", padding: "0 1rem", textAlign: "center",
-          }}>
+          <div className="h-full flex items-center justify-center text-red-400 text-sm px-4 text-center">
             {error}
           </div>
         )}
         {!loading && !error && (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
-            <thead style={{ position: "sticky", top: 0, zIndex: 10, backgroundColor: "#18181b" }}>
+          <table className="w-full border-collapse text-xs">
+            <thead className="sticky top-0 z-10 bg-zinc-900">
               <tr>
                 {cols.map((c) => (
-                  <th key={c} style={{
-                    whiteSpace: "nowrap", borderBottom: "1px solid #3f3f46",
-                    padding: "0.625rem 0.75rem", textAlign: NUMBER_COLS.has(c) ? "right" : "left",
-                    fontWeight: 500, color: "#a1a1aa", fontSize: "0.75rem",
-                  }}>
+                  <th
+                    key={c}
+                    className={`whitespace-nowrap border-b border-zinc-700 px-3 py-2.5 font-medium text-zinc-400 text-xs ${NUMBER_COLS.has(c) ? "text-right" : "text-left"}`}
+                  >
                     {toHeader(c)}
                   </th>
                 ))}
@@ -169,18 +146,16 @@ export function DataViewer({ onClose }: Props) {
             </thead>
             <tbody>
               {pageRows.map((row, ri) => (
-                <tr key={ri} style={{
-                  backgroundColor: ri % 2 === 1 ? "#18181b" : "transparent",
-                  borderBottom: "1px solid #27272a",
-                }}>
+                <tr
+                  key={ri}
+                  className={`border-b border-zinc-800 ${ri % 2 === 1 ? "bg-zinc-900" : ""}`}
+                >
                   {cols.map((c) => (
-                    <td key={c} style={{
-                      whiteSpace: "nowrap", padding: "0.5rem 0.75rem",
-                      color: "#e4e4e7", fontSize: "0.75rem",
-                      textAlign: NUMBER_COLS.has(c) ? "right" : "left",
-                      fontVariantNumeric: NUMBER_COLS.has(c) ? "tabular-nums" : undefined,
-                    }}>
-                      {row[c] == null ? <span style={{ color: "#52525b" }}>—</span> : String(row[c])}
+                    <td
+                      key={c}
+                      className={`whitespace-nowrap px-3 py-2 text-zinc-200 text-xs ${NUMBER_COLS.has(c) ? "text-right tabular-nums" : "text-left"}`}
+                    >
+                      {row[c] == null ? <span className="text-zinc-600">—</span> : String(row[c])}
                     </td>
                   ))}
                 </tr>
@@ -191,15 +166,11 @@ export function DataViewer({ onClose }: Props) {
       </div>
 
       {/* Pagination */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: "0.5rem", borderTop: "1px solid #27272a", backgroundColor: "#18181b",
-        padding: "0.625rem 1rem",
-      }}>
-        <span style={{ fontSize: "0.75rem", color: "#71717a" }}>
+      <div className="flex items-center justify-between gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-2.5">
+        <span className="text-xs text-zinc-500">
           {loading ? "Loading…" : `Page ${page + 1} of ${total} · rows ${firstRow}–${lastRow}`}
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+        <div className="flex items-center gap-1.5">
           {paginationButtons.map(({ label, onClick, disabled }) => {
             const off = loading || disabled;
             return (
@@ -207,13 +178,7 @@ export function DataViewer({ onClose }: Props) {
                 key={label}
                 onClick={onClick}
                 disabled={off}
-                style={{
-                  borderRadius: "0.25rem", padding: "0.25rem 0.5rem", fontSize: "0.75rem",
-                  color: "#71717a", background: "none", border: "none",
-                  opacity: off ? 0.3 : 1, cursor: off ? "default" : "pointer",
-                }}
-                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.color = "#f4f4f5"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "#71717a"; }}
+                className="rounded px-2 py-1 text-xs text-zinc-500 bg-transparent border-0 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-default cursor-pointer transition-colors"
               >
                 {label}
               </button>

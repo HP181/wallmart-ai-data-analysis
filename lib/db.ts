@@ -34,6 +34,13 @@ export function validateSQL(query: string): { valid: boolean; reason?: string } 
   return { valid: true };
 }
 
+export async function getWalmartData(): Promise<Record<string, unknown>[]> {
+  const rows = await sql.query(
+    "SELECT * FROM walmart ORDER BY invoice_id LIMIT 10000"
+  );
+  return rows as Record<string, unknown>[];
+}
+
 export async function executeQuery(query: string): Promise<QueryResult> {
   const check = validateSQL(query);
   if (!check.valid) {
