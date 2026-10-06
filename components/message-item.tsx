@@ -6,18 +6,9 @@ import { DataTable } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import type { AnalysisResult as ToolResult } from "@/lib/analysis";
 import { Bot, User, AlertCircle, Database, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, Fragment } from "react";
-
-type ToolResult = {
-  success: boolean;
-  sql: string;
-  chartConfig: { type: "bar" | "line" | "pie" | "scatter" | "histogram" | "table"; xKey: string; yKey: string; title: string };
-  rows: Record<string, unknown>[];
-  columns: string[];
-  rowCount: number;
-  error?: string;
-};
 
 export function MessageItem({ message }: { message: EveMessage }) {
   const isUser = message.role === "user";
@@ -114,12 +105,27 @@ function AnalysisResult({ result }: { result: ToolResult }) {
   }
 
   const hasChart = result.chartConfig.type !== "table" && result.rows.length > 0;
+  const notes = [
+    ...result.chartWarnings,
+    ...(result.truncated ? [`Showing the first ${result.rowCount} rows. More rows matched.`] : []),
+  ];
 
   return (
     <div className="w-full space-y-3 rounded-2xl border border-border bg-zinc-900/60 p-3 sm:p-4 rounded-tl-sm">
       {/* Chart — rendered before text so container width is established by CSS, not content */}
       {hasChart && (
         <ChartPanel rows={result.rows} chartConfig={result.chartConfig} />
+      )}
+
+      {notes.length > 0 && (
+        <ul className="space-y-1 text-xs text-amber-400/90">
+          {notes.map((note) => (
+            <li key={note} className="flex items-start gap-1.5">
+              <AlertCircle size={12} className="mt-0.5 shrink-0" />
+              <span>{note}</span>
+            </li>
+          ))}
+        </ul>
       )}
 
       {/* Stats row */}
@@ -152,7 +158,7 @@ function AnalysisResult({ result }: { result: ToolResult }) {
         onClick={() => setShowSQL(!showSQL)}
         className="flex w-full items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        <span>View SQL</span>
+        <span>View SQL (read-only, generated from the query)</span>
         {showSQL ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
       </button>
       {showSQL && (

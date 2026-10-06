@@ -6,12 +6,9 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
-export type ChartConfig = {
-  type: "bar" | "line" | "pie" | "scatter" | "histogram" | "table";
-  xKey: string;
-  yKey: string;
-  title: string;
-};
+import { resolveChart, toFiniteNumber, type ChartConfig } from "@/lib/query/chart";
+
+export type { ChartConfig };
 
 type Props = {
   rows: Record<string, unknown>[];
@@ -33,30 +30,8 @@ const tooltipStyle = {
 const tooltipLabelStyle = { color: "#a1a1aa", marginBottom: 4 };
 const tooltipItemStyle  = { color: "#e4e4e7" };
 
-export function ChartPanel({ rows, chartConfig }: Props) {
-  const { type, xKey, yKey, title } = chartConfig;
-
-  if (!rows.length) return null;
-
-  const data = rows.map((r) => ({
-    ...r,
-    [yKey]: typeof r[yKey] === "string" ? parseFloat(r[yKey] as string) : r[yKey],
-  }));
-
-  const axisStyle = { fill: "#a1a1aa", fontSize: 11 };
-
-  // For bar charts: flip to horizontal layout when there are many bars
-  const useHorizontal = type === "bar" && data.length > 6;
-
-  // Y-axis label width based on longest label string
-  const maxLabelLen = Math.max(...data.map((d) => String(d[xKey] ?? "").length));
-  const yAxisWidth = Math.min(Math.max(maxLabelLen * 7, 80), 160);
-
-  // Chart height grows slightly with many horizontal bars
-  const chartHeight = useHorizontal ? Math.max(280, data.length * 28) : 288;
-
-  /* Color legend */
-  const ColorLegend = () => (
+function ColorLegend({ data, xKey }: { data: Record<string, unknown>[]; xKey: string }) {
+  return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 px-1">
       {data.map((entry, i) => (
         <div key={i} className="flex items-center gap-1.5">
@@ -69,6 +44,40 @@ export function ChartPanel({ rows, chartConfig }: Props) {
       ))}
     </div>
   );
+}
+
+/**
+ * Last line of defence before drawing: the server already validates the chart
+ * config, but a chart is only drawn when its keys exist in the rows and the
+ * y values are real numbers. Otherwise nothing is drawn (the data table below
+ * still shows the result).
+ */
+export function ChartPanel({ rows, chartConfig }: Props) {
+  if (!rows.length) return null;
+
+  let resolved;
+  try {
+    resolved = resolveChart(chartConfig, Object.keys(rows[0]), rows);
+  } catch {
+    return null;
+  }
+  if (resolved.config.type === "table") return null;
+
+  const { type, xKey, yKey, title } = resolved.config;
+
+  const data = rows.map((r) => ({ ...r, [yKey]: toFiniteNumber(r[yKey]) }));
+
+  const axisStyle = { fill: "#a1a1aa", fontSize: 11 };
+
+  // For bar charts: flip to horizontal layout when there are many bars
+  const useHorizontal = type === "bar" && data.length > 6;
+
+  // Y-axis label width based on longest label string
+  const maxLabelLen = Math.max(...data.map((d) => String(d[xKey] ?? "").length));
+  const yAxisWidth = Math.min(Math.max(maxLabelLen * 7, 80), 160);
+
+  // Chart height grows slightly with many horizontal bars
+  const chartHeight = useHorizontal ? Math.max(280, data.length * 28) : 288;
 
   return (
     <div className="w-full mt-2">
@@ -179,7 +188,7 @@ export function ChartPanel({ rows, chartConfig }: Props) {
       </div>
 
       {/* Color legend — shown for bar and histogram */}
-      {(type === "bar" || type === "histogram") && <ColorLegend />}
+      {(type === "bar" || type === "histogram") && <ColorLegend data={data} xKey={xKey} />}
     </div>
   );
 }

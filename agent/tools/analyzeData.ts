@@ -1,39 +1,66 @@
-import { defineTool } from "eve/tools";
+import { defineTool, toolOutput } from "eve/tools";
 import { z } from "zod";
-import { executeQuery } from "@/lib/db";
+import { runAnalysis, toModelView, type AnalysisResult } from "@/lib/analysis";
+import { getConfig } from "@/lib/config";
+import { runReadQuery } from "@/lib/db";
+import { toAppError } from "@/lib/errors";
+import { taskLogger } from "@/lib/http";
+import { chartConfigSchema } from "@/lib/query/chart-schema";
+import { querySpecSchema } from "@/lib/query/spec";
 
+/**
+ * The analyst's only data tool. The model describes WHAT it wants (which
+ * groupings, which measures, which filters) from a fixed catalog; the server
+ * compiles that into a parameterized SELECT. The model never writes SQL.
+ */
 export default defineTool({
   description:
-    "Execute a PostgreSQL SELECT query on the Walmart database. Call this for every data question. If the query returns an error, fix the SQL and call again (up to 3 retries).",
+    "Query the Walmart sales table. Choose dimensions (group-by columns), metrics (measures), optional " +
+    "filters, and a chart. Use only IDs listed in the instructions. If it returns success=false, read " +
+    "`error`, fix the query or chartConfig, and call again (up to 3 retries).",
   inputSchema: z.object({
-    sql: z.string().describe("Valid PostgreSQL SELECT query on the walmart table"),
-    chartConfig: z.object({
-      type: z.enum(["bar", "line", "pie", "scatter", "histogram", "table"]),
-      xKey: z.string().describe("Column alias from SELECT for x-axis / category names"),
-      yKey: z.string().describe("Column alias from SELECT for y-axis / values"),
-      title: z.string(),
-    }),
+    query: querySpecSchema,
+    chartConfig: chartConfigSchema,
   }),
-  async execute({ sql, chartConfig }) {
-    const res = await executeQuery(sql);
-    if (res.error) {
-      return {
-        success: false as const,
-        error: res.error,
-        sql,
-        chartConfig,
-        rows: [] as Record<string, unknown>[],
-        columns: [] as string[],
+  async execute({ query, chartConfig }, ctx) {
+    const log = taskLogger({ tool: "analyzeData", callId: ctx.callId, sessionId: ctx.session.id });
+
+    let maxRows: number;
+    try {
+      maxRows = getConfig().maxQueryRows;
+    } catch (err) {
+      // Misconfiguration is the operator's problem; give the model a clean message.
+      const appError = toAppError(err);
+      log.error("analysis unavailable: invalid configuration", { err });
+      const unavailable: AnalysisResult = {
+        success: false,
+        error: appError.message,
+        sql: "",
+        chartConfig: {
+          type: chartConfig.type,
+          xKey: chartConfig.xKey ?? "",
+          yKey: chartConfig.yKey ?? "",
+          title: chartConfig.title,
+        },
+        chartWarnings: [],
+        rows: [],
+        columns: [],
         rowCount: 0,
+        truncated: false,
       };
+      return unavailable;
     }
-    return {
-      success: true as const,
-      sql,
-      chartConfig,
-      rows: res.rows,
-      columns: res.columns,
-      rowCount: res.rowCount,
-    };
+
+    return runAnalysis(
+      { query, chartConfig },
+      {
+        run: (statement) => runReadQuery(statement, { signal: ctx.abortSignal }),
+        maxRows,
+        log,
+      },
+    );
+  },
+  toModelOutput(output) {
+    return toolOutput.json(toModelView(output));
   },
 });

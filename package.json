@@ -9,23 +9,22 @@
     "lint": "eslint",
     "pipeline:clean": "python scripts/clean_data.py",
     "pipeline:migrate": "python scripts/migrate_to_neon.py",
-    "pipeline:all": "python scripts/clean_data.py && python scripts/migrate_to_neon.py"
+    "pipeline:all": "python scripts/clean_data.py && python scripts/migrate_to_neon.py",
+    "db:migrate": "python scripts/apply_migrations.py",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.83",
-    "@ai-sdk/react": "^4.0.130",
     "@base-ui/react": "^1.8.0",
     "@neondatabase/serverless": "^1.2.0",
     "@tanstack/react-table": "^9.2.5",
-    "ag-grid-community": "^36.2.0",
-    "ag-grid-react": "^36.2.0",
     "ai": "^7.0.127",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "eve": "^0.69.0",
     "lucide-react": "^1.49.0",
     "next": "16.3.8",
-    "openai": "^7.27.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
@@ -35,13 +34,15 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   }
 }

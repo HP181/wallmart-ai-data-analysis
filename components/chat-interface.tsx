@@ -21,7 +21,6 @@ export function ChatInterface() {
   const agent = useEveAgent();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const isLoading = agent.status === "submitted" || agent.status === "streaming";
   const messageCount = agent.data.messages.length;
 
@@ -59,7 +58,6 @@ export function ChatInterface() {
 
       {/* ── Messages scroll area ─────────────────────────────── */}
       <div
-        ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto scroll-smooth scrollbar-hide px-3 sm:px-4"
       >
         {agent.data.messages.length === 0 ? (
@@ -122,7 +120,7 @@ function EmptyState({ onSelect }: { onSelect: (q: string) => void }) {
       <h2 className="mb-2 text-lg sm:text-xl font-semibold tracking-tight text-center">
         Walmart AI Analyst
       </h2>
-      <p className="mb-8 text-sm text-muted-foreground text-center max-w-sm, sm:text-lg">
+      <p className="mb-8 text-sm text-muted-foreground text-center max-w-sm sm:max-w-md sm:text-base">
         Ask any question about sales, revenue, branches, customer ratings, or trends.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-2xl">

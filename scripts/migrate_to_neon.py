@@ -16,8 +16,10 @@ Requirements (install once):
 import os
 import pandas as pd
 from sqlalchemy import create_engine, text
-from sqlalchemy import Column, Integer, Text, Float, SmallInteger
+from sqlalchemy import Integer, Text, Float, SmallInteger
 from dotenv import load_dotenv
+
+from apply_migrations import apply_sql_migrations  # scripts/apply_migrations.py
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -96,25 +98,10 @@ def migrate(df: pd.DataFrame, engine) -> None:
     print(f"   ✅ {len(df):,} rows inserted")
 
 
-def create_indexes(engine) -> None:
-    print("\n📌 Creating indexes for faster AI queries...")
-    indexes = [
-        ("idx_category",  "category"),
-        ("idx_branch",    "branch"),
-        ("idx_city",      "city"),
-        ("idx_year",      "year"),
-        ("idx_month",     "month"),
-        ("idx_shift",     "shift"),
-        ("idx_payment",   "payment_method"),
-        ("idx_hour",      "hour"),
-    ]
-    with engine.connect() as conn:
-        for name, col in indexes:
-            conn.execute(text(
-                f"CREATE INDEX IF NOT EXISTS {name} ON {TABLE_NAME} ({col})"
-            ))
-            print(f"   ✅ {name}")
-        conn.commit()
+def apply_migrations(engine) -> None:
+    """Typed date/time columns and indexes live in scripts/sql/*.sql (single source of truth)."""
+    print("\n📌 Applying SQL migrations (typed date/time columns, indexes)...")
+    apply_sql_migrations(engine)
 
 
 def verify(engine) -> None:
@@ -128,14 +115,15 @@ def verify(engine) -> None:
             ORDER BY ordinal_position
         """)).fetchall()
         sample = conn.execute(text(
-            f"SELECT invoice_id, branch, category, total, shift FROM {TABLE_NAME} LIMIT 3"
+            f"SELECT invoice_id, branch, category, total, shift, sale_date, sale_time "
+            f"FROM {TABLE_NAME} ORDER BY invoice_id LIMIT 3"
         )).fetchall()
 
     print(f"   Row count : {count:,}")
     print(f"\n   Columns in Neon ({len(cols)}):")
     for col_name, dtype in cols:
         print(f"     {col_name:<20} {dtype}")
-    print(f"\n   Sample rows:")
+    print(f"\n   Sample rows (sale_date / sale_time are the typed columns):")
     for row in sample:
         print(f"     {dict(row._mapping)}")
 
@@ -157,7 +145,7 @@ def main():
     print("   ✅ Connected")
 
     migrate(df, engine)
-    create_indexes(engine)
+    apply_migrations(engine)
     verify(engine)
 
     print("\n🎉 Migration complete!")
