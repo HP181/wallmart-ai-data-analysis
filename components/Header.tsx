@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart2, Database, Download, Sparkles, Table2 } from "lucide-react";
+import { toast } from "@/components/toast";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -55,12 +56,41 @@ export function useHealth(): HealthState {
 const linkButton =
   "flex items-center gap-1.5 rounded-lg border border-border bg-zinc-800 px-2.5 py-1.5 text-xs text-muted-foreground hover:border-indigo-500/40 hover:text-foreground transition-all";
 
+async function triggerExport(url: string, filename: string) {
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    toast("Export failed. Check your connection and try again.");
+    return;
+  }
+  if (res.status === 429) {
+    const retryAfter = res.headers.get("retry-after") ?? "60";
+    toast(`Export limit reached. Please wait ${retryAfter}s before trying again.`);
+    return;
+  }
+  if (!res.ok) {
+    toast("Export failed. Please try again.");
+    return;
+  }
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
 export default function Header() {
   const health = useHealth();
   const badge = statusBadge(health);
   const tone = TONES[badge.tone];
   const model = health.kind === "ready" ? health.model : undefined;
   const database = health.kind === "ready" ? health.dataset?.database : undefined;
+  const [exporting, setExporting] = useState(false);
 
   return (
     <header className="shrink-0 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur px-4 sm:px-6 py-3 gap-3">
@@ -109,15 +139,21 @@ export default function Header() {
             <Table2 size={12} />
             <span className="hidden sm:inline">View Data</span>
           </Link>
-          <a
-            href="/api/export"
-            download="walmart_cleaned_data.csv"
-            className={linkButton}
+          <button
+            onClick={() => {
+              if (exporting) return;
+              setExporting(true);
+              triggerExport("/api/export", "walmart_cleaned_data.csv").finally(() =>
+                setExporting(false),
+              );
+            }}
+            disabled={exporting}
+            className={`${linkButton} disabled:opacity-50 disabled:cursor-not-allowed`}
             title="Download the dataset as CSV"
           >
-            <Download size={12} />
-            <span className="hidden sm:inline">Export CSV</span>
-          </a>
+            <Download size={12} className={exporting ? "animate-pulse" : ""} />
+            <span className="hidden sm:inline">{exporting ? "Exporting…" : "Export CSV"}</span>
+          </button>
         </div>
       </div>
     </header>

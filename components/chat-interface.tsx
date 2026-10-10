@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useRef, useState } from "react";
 import { Send, Square, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/toast";
 
 const EXAMPLE_QUESTIONS = [
   "Which product category has the highest total revenue?",
@@ -16,6 +17,19 @@ const EXAMPLE_QUESTIONS = [
   "Which city has the best average customer rating?",
   "Show revenue trends by month",
 ];
+
+/** Map an eve session error to a user-friendly toast message. */
+function toastForAgentError(err: Error | undefined) {
+  if (!err) return;
+  const msg = err.message ?? "";
+  if (/too many|rate.?limit|429/i.test(msg)) {
+    toast("You're sending messages too quickly. Please wait a moment before trying again.");
+  } else if (/body too large|413/i.test(msg)) {
+    toast("Your message is too long. Please shorten it and try again.");
+  } else {
+    toast("Something went wrong sending your message. Please try again.");
+  }
+}
 
 export function ChatInterface() {
   const agent = useEveAgent();
@@ -38,10 +52,27 @@ export function ChatInterface() {
     }
   }, [isLoading]);
 
+  // Show a toast whenever the agent enters the terminal "error" state.
+  // Use a ref to avoid re-toasting the same error across re-renders.
+  const lastErrorRef = useRef<Error | undefined>(undefined);
+  useEffect(() => {
+    if (agent.status === "error" && agent.error !== lastErrorRef.current) {
+      lastErrorRef.current = agent.error;
+      toastForAgentError(agent.error);
+    }
+  }, [agent.status, agent.error]);
+
   function handleSend(text?: string) {
     const q = (text ?? input).trim();
     if (!q || isLoading) return;
-    void agent.send(q);
+    // agent.send() rejects if the request fails (e.g. 429 from proxy.ts).
+    // The rejection also flips agent.status to "error", so the useEffect
+    // above handles the toast. The catch here is a safety net.
+    agent.send(q).catch((err: unknown) => {
+      if (agent.status !== "error") {
+        toastForAgentError(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
     setInput("");
   }
 

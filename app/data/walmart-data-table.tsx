@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   FILTER_OPTIONS,
@@ -171,6 +172,7 @@ export function WalmartDataTable() {
     hour: false,
   });
   const [colPanelOpen, setColPanelOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const colPanelRef = useRef<HTMLDivElement>(null);
 
   // Search is debounced so each keystroke does not hit the database. The
@@ -340,15 +342,49 @@ export function WalmartDataTable() {
           )}
         </div>
 
-        <a
-          href={exportHref(grid)}
-          download="walmart_cleaned_data.csv"
-          className="flex h-9 items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+        <button
+          onClick={() => {
+            if (exporting) return;
+            setExporting(true);
+            const url = exportHref(grid);
+            let res: Response;
+            fetch(url)
+              .then((r) => {
+                res = r;
+                if (r.status === 429) {
+                  const retryAfter = r.headers.get("retry-after") ?? "60";
+                  toast(`Export limit reached. Please wait ${retryAfter}s before trying again.`);
+                  throw new Error("rate_limited");
+                }
+                if (!r.ok) {
+                  toast("Export failed. Please try again.");
+                  throw new Error("export_failed");
+                }
+                return r.blob();
+              })
+              .then((blob) => {
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = "walmart_cleaned_data.csv";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+              })
+              .catch((err: unknown) => {
+                if (err instanceof Error && (err.message === "rate_limited" || err.message === "export_failed")) return;
+                toast("Export failed. Check your connection and try again.");
+              })
+              .finally(() => setExporting(false));
+          }}
+          disabled={exporting}
+          className="flex h-9 items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={hasFilters ? "Download the filtered rows as CSV" : "Download all rows as CSV"}
         >
-          <Download className="h-3.5 w-3.5" />
-          {hasFilters ? "Export filtered" : "Export all"}
-        </a>
+          <Download className={`h-3.5 w-3.5 ${exporting ? "animate-pulse" : ""}`} />
+          {exporting ? "Exporting…" : hasFilters ? "Export filtered" : "Export all"}
+        </button>
 
         <div className="flex items-center gap-2 text-xs text-zinc-500 ml-auto">
           <span>Rows per page</span>

@@ -87,13 +87,15 @@ Every response carries an `x-request-id` header (an incoming valid one is reused
 
 Rate limits are enforced in-process per Fluid Compute instance (no shared store required). For stricter multi-instance enforcement, back the limiter with a shared store such as Vercel KV or Upstash Redis.
 
-| Surface | Limit | HTTP status |
-|---|---|---|
-| `POST /eve/v1/session*` (chat messages) | `RATE_LIMIT_CHAT` per IP per minute | 429 |
-| Chat request body | 8 KB | 413 |
-| `GET /api/export` | `RATE_LIMIT_EXPORT` per IP per minute | 429 |
+| Surface | Limit | HTTP status | User feedback |
+|---|---|---|---|
+| `POST /eve/v1/session*` (chat messages) | `RATE_LIMIT_CHAT` per IP per minute | 429 | Toast notification |
+| Chat request body | 8 KB | 413 | Toast notification |
+| `GET /api/export` | `RATE_LIMIT_EXPORT` per IP per minute | 429 | Toast notification |
 
 Query complexity is bounded at the schema layer: max 3 dimensions, 6 metrics, 8 filters per tool call. The `analyzeData` tool enforces a hard `TOOL_TIMEOUT_MS` ceiling (default 20 s) as a belt-and-suspenders guard above the database statement timeout.
+
+All limit violations surface as a toast notification in the bottom-right corner of the UI — the user never silently receives a downloaded error file or an unanswered message.
 
 ## Observability
 
@@ -116,16 +118,17 @@ npm run dev 2>&1 | jq 'select(.alert != null)'
 ## Project layout
 
 ```
-agent/            eve agent, instructions.md (prompt), tools/analyzeData.ts
-app/              Next.js routes: chat page, /data grid, /api/*
-components/       chat, chart panel, header (status from /api/health)
-lib/rate-limit.ts token-bucket rate limiter + IP extraction
-lib/query/        catalog (allowlist), spec (zod), compile (SQL), chart (validation)
-lib/data/rows.ts  paging, filtering and export batches for the raw table
-lib/              config, db, errors, logger, http (request ids), csv, analysis
-proxy.ts          Next.js 16 Proxy: chat rate limit + body-size guard
-scripts/          Python cleaning and load pipeline, SQL migrations
-tests/            shared test helpers (in-process Postgres loaded with the real data)
+agent/               eve agent, instructions.md (prompt), tools/analyzeData.ts
+app/                 Next.js routes: chat page, /data grid, /api/*
+components/          chat, chart panel, header, toast notification system
+components/toast.tsx module-level toast — call toast() from anywhere, <Toaster> in layout
+lib/rate-limit.ts    token-bucket rate limiter + IP extraction
+lib/query/           catalog (allowlist), spec (zod), compile (SQL), chart (validation)
+lib/data/rows.ts     paging, filtering and export batches for the raw table
+lib/                 config, db, errors, logger, http (request ids), csv, analysis
+proxy.ts             Next.js 16 Proxy: chat rate limit + body-size guard
+scripts/             Python cleaning and load pipeline, SQL migrations
+tests/               shared test helpers (in-process Postgres loaded with the real data)
 ```
 
 ## Testing
