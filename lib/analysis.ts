@@ -90,6 +90,7 @@ export async function runAnalysis(
   } catch (err) {
     const appError: AppError = toAppError(err);
     deps.log.error("analysis query failed", {
+      alert: "db_error",
       ...queryShape,
       err: appError.cause ?? appError,
       code: appError.code,

@@ -59,12 +59,13 @@ export async function runReadQueries(
   options: RunOptions = {},
 ): Promise<Row[][]> {
   if (statements.length === 0) return [];
-  const { queryTimeoutMs } = getConfig();
+  const { queryTimeoutMs, slowQueryMs } = getConfig();
   const sql = getSql();
 
   // The timeout is a validated integer from config, so inlining it is safe
   // (SET does not accept bind parameters).
   const timeout = Math.trunc(queryTimeoutMs);
+  const started = performance.now();
   const results = await sql.transaction(
     [
       sql.query(`SET LOCAL statement_timeout = ${timeout}`),
@@ -75,6 +76,16 @@ export async function runReadQueries(
       ...(options.signal ? { fetchOptions: { signal: options.signal } } : {}),
     },
   );
+  const durationMs = Math.round(performance.now() - started);
+
+  if (durationMs > slowQueryMs) {
+    logger.warn("slow database query", {
+      alert: "slow_query",
+      durationMs,
+      thresholdMs: slowQueryMs,
+      statementCount: statements.length,
+    });
+  }
 
   // results[0] is the SET LOCAL command.
   return (results as unknown as Row[][]).slice(1);

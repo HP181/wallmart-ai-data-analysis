@@ -86,6 +86,11 @@ export function toAppError(err: unknown): AppError {
   if (/fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|NeonDbError/i.test(`${name} ${message}`)) {
     return new AppError("db_unavailable", "The database is unavailable.", { cause: err });
   }
+  // AbortSignal.timeout() throws DOMException("TimeoutError"); request cancellation throws
+  // DOMException("AbortError"). Both mean the query did not complete within its budget.
+  if (name === "TimeoutError" || name === "AbortError") {
+    return new AppError("db_timeout", "The query took too long and was cancelled.", { cause: err });
+  }
 
   return new AppError("internal_error", "Something went wrong. Please try again.", { cause: err });
 }

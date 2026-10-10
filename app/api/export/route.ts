@@ -2,7 +2,8 @@ import { toCsvLine } from "@/lib/csv";
 import { getConfig } from "@/lib/config";
 import { runReadQuery, type Row } from "@/lib/db";
 import { EXPORT_COLUMNS, buildExportBatch, parseRowFilters } from "@/lib/data/rows";
-import { withRoute } from "@/lib/http";
+import { withRoute, jsonResponse } from "@/lib/http";
+import { exportLimiter, getClientIp } from "@/lib/rate-limit";
 
 /**
  * GET /api/export
@@ -16,7 +17,21 @@ import { withRoute } from "@/lib/http";
  * If a later batch fails, the stream is errored so the client sees a failed
  * download rather than a truncated file that looks complete.
  */
+/** Row count that triggers an export-volume observability alert. */
+const EXPORT_ALERT_ROWS = 50_000;
+
 export const GET = withRoute("export.csv", async (request, { log }) => {
+  // Rate-limit exports: they are expensive (streaming full table scans).
+  const ip = getClientIp(request.headers);
+  const rateCheck = exportLimiter.check(ip);
+  if (!rateCheck.allowed) {
+    const retryAfter = String(Math.ceil(rateCheck.retryAfterMs / 1_000));
+    return jsonResponse(
+      { error: { code: "rate_limited", message: "Too many export requests. Please wait before trying again." } },
+      { status: 429, headers: { "Retry-After": retryAfter } },
+    );
+  }
+
   const filters = parseRowFilters(new URL(request.url).searchParams);
   const { exportBatchSize, exportMaxRows } = getConfig();
   const encoder = new TextEncoder();
@@ -55,7 +70,11 @@ export const GET = withRoute("export.csv", async (request, { log }) => {
           if (capped && !exhausted) {
             log.warn("export truncated at EXPORT_MAX_ROWS", { rows: sent, max: exportMaxRows });
           }
-          log.info("export complete", { rows: sent });
+          if (sent >= EXPORT_ALERT_ROWS) {
+            log.warn("large export completed", { alert: "export_volume", rows: sent, ip });
+          } else {
+            log.info("export complete", { rows: sent });
+          }
           controller.close();
         }
       } catch (err) {

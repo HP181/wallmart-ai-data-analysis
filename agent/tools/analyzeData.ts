@@ -13,6 +13,15 @@ import { querySpecSchema } from "@/lib/query/spec";
  * groupings, which measures, which filters) from a fixed catalog; the server
  * compiles that into a parameterized SELECT. The model never writes SQL.
  */
+
+/**
+ * Per-session count of consecutive failed analysis calls (in-process).
+ * Cleared on success; alerts when a session exceeds the threshold. Helps detect
+ * a confused or looping model before it runs up the AI bill.
+ */
+const consecutiveFailures = new Map<string, number>();
+const FAILURE_ALERT_THRESHOLD = 3;
+
 export default defineTool({
   description:
     "Query the Walmart sales table. Choose dimensions (group-by columns), metrics (measures), optional " +
@@ -23,11 +32,15 @@ export default defineTool({
     chartConfig: chartConfigSchema,
   }),
   async execute({ query, chartConfig }, ctx) {
-    const log = taskLogger({ tool: "analyzeData", callId: ctx.callId, sessionId: ctx.session.id });
+    const sessionId = ctx.session.id;
+    const log = taskLogger({ tool: "analyzeData", callId: ctx.callId, sessionId });
 
     let maxRows: number;
+    let toolTimeoutMs: number;
     try {
-      maxRows = getConfig().maxQueryRows;
+      const config = getConfig();
+      maxRows = config.maxQueryRows;
+      toolTimeoutMs = config.toolTimeoutMs;
     } catch (err) {
       // Misconfiguration is the operator's problem; give the model a clean message.
       const appError = toAppError(err);
@@ -51,14 +64,40 @@ export default defineTool({
       return unavailable;
     }
 
-    return runAnalysis(
+    // Composite abort signal: honour the eve turn signal AND enforce a hard
+    // per-tool timeout as a belt-and-suspenders guard above DB_QUERY_TIMEOUT_MS.
+    const toolTimeoutSignal = AbortSignal.timeout(toolTimeoutMs);
+    const toolSignal =
+      ctx.abortSignal
+        ? AbortSignal.any([ctx.abortSignal, toolTimeoutSignal])
+        : toolTimeoutSignal;
+
+    const result = await runAnalysis(
       { query, chartConfig },
       {
-        run: (statement) => runReadQuery(statement, { signal: ctx.abortSignal }),
+        run: (statement) => runReadQuery(statement, { signal: toolSignal }),
         maxRows,
         log,
       },
     );
+
+    // Track consecutive failures and alert when the model keeps failing.
+    if (!result.success) {
+      const count = (consecutiveFailures.get(sessionId) ?? 0) + 1;
+      consecutiveFailures.set(sessionId, count);
+      if (count >= FAILURE_ALERT_THRESHOLD) {
+        log.warn("repeated analysis failures", {
+          alert: "repeated_failures",
+          sessionId,
+          failureCount: count,
+          error: result.error,
+        });
+      }
+    } else {
+      consecutiveFailures.delete(sessionId);
+    }
+
+    return result;
   },
   toModelOutput(output) {
     return toolOutput.json(toModelView(output));

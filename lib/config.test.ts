@@ -20,6 +20,8 @@ describe("loadConfig", () => {
       maxQueryRows: 500,
       exportBatchSize: 1000,
       exportMaxRows: 250000,
+      toolTimeoutMs: 20000,
+      slowQueryMs: 3000,
     });
   });
 

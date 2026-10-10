@@ -45,6 +45,10 @@ const envSchema = z.object({
   MAX_QUERY_ROWS: boundedInt(1, 5_000, 500),
   EXPORT_BATCH_SIZE: boundedInt(100, 5_000, 1_000),
   EXPORT_MAX_ROWS: boundedInt(1, 5_000_000, 250_000),
+  /** Hard ceiling for one analyzeData tool call (ms). Belt-and-suspenders above DB_QUERY_TIMEOUT_MS. */
+  TOOL_TIMEOUT_MS: boundedInt(5_000, 120_000, 20_000),
+  /** Log a warning when a DB transaction takes longer than this (ms). */
+  SLOW_QUERY_MS: boundedInt(100, 30_000, 3_000),
 });
 
 export type Config = {
@@ -60,6 +64,10 @@ export type Config = {
   exportBatchSize: number;
   /** Hard cap on rows in one CSV export. */
   exportMaxRows: number;
+  /** Hard ceiling for one analyzeData tool call, belt-and-suspenders above queryTimeoutMs. */
+  toolTimeoutMs: number;
+  /** Warn when a DB transaction exceeds this duration. */
+  slowQueryMs: number;
 };
 
 export type ConfigStatus = {
@@ -97,6 +105,8 @@ export function loadConfig(env: Env = process.env): Config {
     maxQueryRows: v.MAX_QUERY_ROWS,
     exportBatchSize: v.EXPORT_BATCH_SIZE,
     exportMaxRows: v.EXPORT_MAX_ROWS,
+    toolTimeoutMs: v.TOOL_TIMEOUT_MS,
+    slowQueryMs: v.SLOW_QUERY_MS,
   };
 }
 
