@@ -5,6 +5,7 @@ import { getConfig } from "@/lib/config";
 import { runReadQuery } from "@/lib/db";
 import { toAppError } from "@/lib/errors";
 import { taskLogger } from "@/lib/http";
+import { checkChatRateLimit } from "@/lib/rate-limit";
 import { chartConfigSchema } from "@/lib/query/chart-schema";
 import { querySpecSchema } from "@/lib/query/spec";
 
@@ -24,6 +25,51 @@ export default defineTool({
   }),
   async execute({ query, chartConfig }, ctx) {
     const log = taskLogger({ tool: "analyzeData", callId: ctx.callId, sessionId: ctx.session.id });
+
+    try {
+      const rate = await checkChatRateLimit(ctx.session.id);
+      if (!rate.success) {
+        log.warn("chat rate limit exceeded", {
+          limit: rate.limit,
+          remaining: rate.remaining,
+          reset: rate.reset,
+        });
+        return {
+          success: false,
+          error: "Chat rate limit exceeded. Please wait and try again.",
+          sql: "",
+          chartConfig: {
+            type: chartConfig.type,
+            xKey: chartConfig.xKey ?? "",
+            yKey: chartConfig.yKey ?? "",
+            title: chartConfig.title,
+          },
+          chartWarnings: [],
+          rows: [],
+          columns: [],
+          rowCount: 0,
+          truncated: false,
+        } satisfies AnalysisResult;
+      }
+    } catch (err) {
+      log.error("chat rate limiter unavailable", { err });
+      return {
+        success: false,
+        error: "Chat protection is temporarily unavailable. Please try again.",
+        sql: "",
+        chartConfig: {
+          type: chartConfig.type,
+          xKey: chartConfig.xKey ?? "",
+          yKey: chartConfig.yKey ?? "",
+          title: chartConfig.title,
+        },
+        chartWarnings: [],
+        rows: [],
+        columns: [],
+        rowCount: 0,
+        truncated: false,
+      } satisfies AnalysisResult;
+    }
 
     let maxRows: number;
     try {
