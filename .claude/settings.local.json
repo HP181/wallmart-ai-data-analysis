@@ -9,7 +9,13 @@
       "Bash(npm test:*)",
       "Bash(npx vitest:*)",
       "Bash(xargs grep:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "Bash(vercel env:*)",
+      "Bash(vercel link:*)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(vercel list:*)",
+      "Bash(vercel logs:*)"
     ]
   }
 }

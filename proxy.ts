@@ -1,23 +1,17 @@
 /**
- * Next.js 16 Proxy (formerly middleware) — rate-limits and body-size-guards
- * the eve chat channel at the platform edge.
+ * Next.js 16 Proxy (formerly middleware) — body-size guard for the eve chat
+ * channel on the local dev server.
  *
- * Runs before every matched request. In-process state is shared within one
- * Fluid Compute instance, so limits apply per warm instance. For strict
- * multi-instance enforcement, back the limiter with a shared store.
+ * On Vercel, withEve routes /eve/v1/* directly to the Eve Nitro function at
+ * the CDN level, bypassing this proxy entirely. Rate limiting is therefore
+ * enforced inside the Eve channel's auth array (agent/channels/eve.ts) so it
+ * runs on both Vercel and local dev.
  */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { chatLimiter } from "@/lib/rate-limit";
 
 /** Maximum allowed Content-Length for a chat POST body (bytes). */
 const MAX_CHAT_BODY_BYTES = 8_192; // 8 KB — comfortably above any real message
-
-function getIp(request: NextRequest): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return request.headers.get("x-real-ip") ?? "unknown";
-}
 
 function json(body: object, status: number, extra?: HeadersInit): NextResponse {
   return new NextResponse(JSON.stringify(body), {
@@ -26,7 +20,7 @@ function json(body: object, status: number, extra?: HeadersInit): NextResponse {
   });
 }
 
-export async function proxy(request: NextRequest): Promise<NextResponse> {
+export function proxy(request: NextRequest): NextResponse {
   // Only gate session POST requests (creates + follow-ups).
   if (request.method !== "POST") return NextResponse.next();
 
@@ -40,18 +34,6 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         413,
       );
     }
-  }
-
-  // Per-IP rate limit.
-  const ip = getIp(request);
-  const result = await chatLimiter.check(ip);
-  if (!result.allowed) {
-    const retryAfter = String(Math.ceil(result.retryAfterMs / 1_000));
-    return json(
-      { ok: false, error: "Too many requests. Please wait before sending another message." },
-      429,
-      { "Retry-After": retryAfter },
-    );
   }
 
   return NextResponse.next();
