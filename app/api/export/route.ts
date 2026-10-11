@@ -23,7 +23,7 @@ const EXPORT_ALERT_ROWS = 50_000;
 export const GET = withRoute("export.csv", async (request, { log }) => {
   // Rate-limit exports: they are expensive (streaming full table scans).
   const ip = getClientIp(request.headers);
-  const rateCheck = exportLimiter.check(ip);
+  const rateCheck = await exportLimiter.check(ip);
   if (!rateCheck.allowed) {
     const retryAfter = String(Math.ceil(rateCheck.retryAfterMs / 1_000));
     return jsonResponse(

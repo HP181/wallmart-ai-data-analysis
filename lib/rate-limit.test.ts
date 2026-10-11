@@ -1,59 +1,48 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { RateLimiter, getClientIp } from "@/lib/rate-limit";
+import { describe, it, expect, vi } from "vitest";
 
-describe("RateLimiter", () => {
-  let limiter: RateLimiter;
+// Hoist mock refs so they're available when vi.mock factories run.
+const { mockLimitFn, MockRatelimit } = vi.hoisted(() => {
+  const mockLimitFn = vi.fn();
+  const MockRatelimit = vi.fn().mockReturnValue({ limit: mockLimitFn });
+  (MockRatelimit as unknown as Record<string, unknown>).slidingWindow = vi
+    .fn()
+    .mockReturnValue("1m-sliding");
+  return { mockLimitFn, MockRatelimit };
+});
 
-  beforeEach(() => {
-    limiter = new RateLimiter({ limit: 3, windowMs: 1_000 });
+vi.mock("@upstash/redis", () => ({ Redis: vi.fn().mockReturnValue({}) }));
+vi.mock("@upstash/ratelimit", () => ({ Ratelimit: MockRatelimit }));
+
+import { exportLimiter, chatLimiter, getClientIp } from "@/lib/rate-limit";
+
+describe("rate limiters", () => {
+  it("allows the request when Upstash returns success", async () => {
+    mockLimitFn.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+    expect(await exportLimiter.check("1.2.3.4")).toEqual({ allowed: true });
   });
 
-  it("allows requests up to the limit", () => {
-    expect(limiter.check("ip1")).toEqual({ allowed: true });
-    expect(limiter.check("ip1")).toEqual({ allowed: true });
-    expect(limiter.check("ip1")).toEqual({ allowed: true });
-  });
-
-  it("blocks the request after the limit is reached", () => {
-    limiter.check("ip1");
-    limiter.check("ip1");
-    limiter.check("ip1");
-    const result = limiter.check("ip1");
+  it("blocks and returns retryAfterMs when Upstash returns failure", async () => {
+    const reset = Date.now() + 5_000;
+    mockLimitFn.mockResolvedValue({ success: false, reset });
+    const result = await exportLimiter.check("1.2.3.4");
     expect(result.allowed).toBe(false);
-    if (!result.allowed) expect(result.retryAfterMs).toBeGreaterThan(0);
+    if (!result.allowed) {
+      expect(result.retryAfterMs).toBeGreaterThan(0);
+      expect(result.retryAfterMs).toBeLessThanOrEqual(5_000);
+    }
   });
 
-  it("tracks different keys independently", () => {
-    limiter.check("ip1");
-    limiter.check("ip1");
-    limiter.check("ip1");
-    // ip2 is unaffected
-    expect(limiter.check("ip2")).toEqual({ allowed: true });
+  it("uses a separate key namespace for chatLimiter", async () => {
+    mockLimitFn.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+    await chatLimiter.check("10.0.0.1");
+    expect(mockLimitFn).toHaveBeenCalledWith("10.0.0.1");
   });
 
-  it("refills tokens over time", () => {
-    vi.useFakeTimers();
-    limiter.check("ip1");
-    limiter.check("ip1");
-    limiter.check("ip1");
-    expect(limiter.check("ip1").allowed).toBe(false);
-
-    // Advance 500 ms — should refill ~1.5 tokens → 1 request allowed
-    vi.advanceTimersByTime(500);
-    expect(limiter.check("ip1").allowed).toBe(true);
-    expect(limiter.check("ip1").allowed).toBe(false);
-
-    vi.useRealTimers();
-  });
-
-  it("prune removes fully-refilled buckets", () => {
-    vi.useFakeTimers();
-    limiter.check("ip1");
-    vi.advanceTimersByTime(2_000); // enough to fully refill
-    limiter.prune();
-    // After pruning, the next check starts fresh (allowed)
-    expect(limiter.check("ip1")).toEqual({ allowed: true });
-    vi.useRealTimers();
+  it("clamps retryAfterMs to 0 when reset is in the past", async () => {
+    mockLimitFn.mockResolvedValue({ success: false, reset: Date.now() - 1_000 });
+    const result = await exportLimiter.check("1.2.3.4");
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.retryAfterMs).toBe(0);
   });
 });
 

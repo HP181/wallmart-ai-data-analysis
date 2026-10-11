@@ -26,7 +26,7 @@ function json(body: object, status: number, extra?: HeadersInit): NextResponse {
   });
 }
 
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Only gate session POST requests (creates + follow-ups).
   if (request.method !== "POST") return NextResponse.next();
 
@@ -44,7 +44,7 @@ export function proxy(request: NextRequest): NextResponse {
 
   // Per-IP rate limit.
   const ip = getIp(request);
-  const result = chatLimiter.check(ip);
+  const result = await chatLimiter.check(ip);
   if (!result.allowed) {
     const retryAfter = String(Math.ceil(result.retryAfterMs / 1_000));
     return json(

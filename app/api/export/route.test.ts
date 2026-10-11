@@ -4,6 +4,11 @@ import { resetConfigForTests } from "@/lib/config";
 const db = vi.hoisted(() => ({ runReadQueries: vi.fn(), runReadQuery: vi.fn(), probeDataset: vi.fn() }));
 vi.mock("@/lib/db", () => db);
 
+vi.mock("@/lib/rate-limit", () => ({
+  exportLimiter: { check: vi.fn().mockResolvedValue({ allowed: true }) },
+  getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
+}));
+
 import { GET } from "@/app/api/export/route";
 import { EXPORT_COLUMNS } from "@/lib/data/rows";
 
